@@ -1,7 +1,15 @@
 import sqlite3
+import sys
 from pathlib import Path
 
-DB_PATH = Path(__file__).resolve().parent.parent / "mnotes.db"
+
+def _db_path() -> Path:
+    if getattr(sys, 'frozen', False):
+        return Path(sys.executable).parent / "mnotes.db"
+    return Path(__file__).resolve().parent.parent / "mnotes.db"
+
+
+DB_PATH = _db_path()
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS categories (
