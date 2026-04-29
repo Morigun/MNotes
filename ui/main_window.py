@@ -1,5 +1,6 @@
 from database.models import Note
 from database.repository import Repository
+from database.db_manager import DB_PATH
 from ui.note_card import NoteCard
 from ui.detail_dialog import DetailDialog
 from ui.sidebar import Sidebar
@@ -9,6 +10,7 @@ from ui.notes_grid import FlowLayout
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QScrollArea,
     QToolBar, QStatusBar, QPushButton, QMenu, QLabel, QInputDialog, QMessageBox,
+    QApplication, QFileDialog, QFrame,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction, QKeySequence, QIcon, QCloseEvent
@@ -35,11 +37,14 @@ class MainWindow(QMainWindow):
 
         self._repo = Repository()
         self._cards: list[NoteCard] = []
+        self._selected_ids: set[int] = set()
         self._current_filter: dict = {}
         self._current_parent: int = 0
         self._nav_stack: list[int] = []
 
         self._setup_ui()
+        self._setup_menu_bar()
+        self._init_theme_state()
         self._setup_actions()
         self._load_notes()
 
@@ -93,23 +98,28 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(toolbar)
 
         self._breadcrumb_layout = QHBoxLayout()
-        self._breadcrumb_layout.setContentsMargins(12, 6, 12, 0)
+        self._breadcrumb_layout.setContentsMargins(0, 6, 12, 0)
 
         self._back_btn = QPushButton("← Назад")
         self._back_btn.clicked.connect(self._go_back)
         self._back_btn.setVisible(False)
         self._breadcrumb_layout.addWidget(self._back_btn)
+        self._breadcrumb_layout.addSpacing(4)
 
         self._breadcrumb_label = QLabel("Все заметки")
         self._breadcrumb_label.setObjectName("cardTitle")
         self._breadcrumb_layout.addWidget(self._breadcrumb_label)
         self._breadcrumb_layout.addStretch()
         right_layout.addLayout(self._breadcrumb_layout)
+        right_layout.addSpacing(6)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.viewport().setAutoFillBackground(False)
         scroll.setObjectName("notesGrid")
         self._grid_container = QWidget()
+        self._grid_container.setObjectName("gridContainer")
         self._flow_layout = FlowLayout(self._grid_container, margin=12, hspacing=12, vspacing=12)
         scroll.setWidget(self._grid_container)
         right_layout.addWidget(scroll)
@@ -125,6 +135,33 @@ class MainWindow(QMainWindow):
             self._flow_layout.removeWidget(card)
             card.deleteLater()
         self._cards.clear()
+        self._selected_ids.clear()
+
+    def _on_card_clicked(self, note_id: int, ctrl: bool):
+        if ctrl:
+            if note_id in self._selected_ids:
+                self._selected_ids.discard(note_id)
+            else:
+                self._selected_ids.add(note_id)
+        else:
+            self._selected_ids.clear()
+            self._selected_ids.add(note_id)
+        self._update_card_selections()
+
+    def _update_card_selections(self):
+        for card in self._cards:
+            card.set_selected(card.note_id in self._selected_ids)
+
+    def _clear_selection(self):
+        self._selected_ids.clear()
+        self._update_card_selections()
+
+    def _select_all(self):
+        self._selected_ids = {c.note_id for c in self._cards}
+        self._update_card_selections()
+
+    def _card_by_id(self, note_id: int) -> NoteCard | None:
+        return next((c for c in self._cards if c.note_id == note_id), None)
 
     def _load_notes(self):
         self._clear_cards()
@@ -151,6 +188,8 @@ class MainWindow(QMainWindow):
                 in_folder=self._current_parent != 0,
             )
             card.double_clicked.connect(self._open_note)
+            card.clicked.connect(self._on_card_clicked)
+            card.context_menu_requested.connect(self._on_card_context_menu)
             card.remove_from_folder.connect(self._remove_from_folder)
             card.rename_folder.connect(self._rename_folder)
             card.delete_folder.connect(self._delete_folder)
@@ -203,20 +242,99 @@ class MainWindow(QMainWindow):
             self._repo.update_note(note)
             self._load_notes()
 
+    def _on_card_context_menu(self, note_id: int, pos):
+        if note_id not in self._selected_ids:
+            self._selected_ids.clear()
+            self._selected_ids.add(note_id)
+            self._update_card_selections()
+
+        menu = QMenu(self)
+        ids = list(self._selected_ids)
+        folders_in_sel = sum(
+            1 for c in self._cards if c.note_id in self._selected_ids and c.note_type == "folder"
+        )
+        in_folder_in_sel = sum(
+            1 for c in self._cards if c.note_id in self._selected_ids and c._in_folder
+        )
+
+        if len(ids) == 1:
+            menu.addAction("Открыть", lambda: self._open_selected())
+        else:
+            menu.addAction(f"Открыть все ({len(ids)})", lambda: self._open_selected())
+
+        if len(ids) == 1 and folders_in_sel == 1:
+            menu.addAction("Переименовать", lambda: self._rename_folder(ids[0]))
+
+        menu.addAction(
+            "Закрепить / Открепить" if len(ids) == 1 else f"Закрепить / Открепить ({len(ids)})",
+            self._toggle_pin_selected,
+        )
+
+        del_label = "В корзину" if len(ids) == 1 else f"В корзину ({len(ids)})"
+        menu.addAction(del_label, lambda: self._delete_items(ids))
+
+        if in_folder_in_sel > 0:
+            menu.addSeparator()
+            if in_folder_in_sel == 1:
+                nid = next(c.note_id for c in self._cards if c.note_id in self._selected_ids and c._in_folder)
+                menu.addAction("Убрать из папки", lambda: self._remove_from_folder(nid))
+            else:
+                menu.addAction(f"Убрать из папки ({in_folder_in_sel})", lambda: self._remove_selected_from_folder())
+
+        menu.exec(pos)
+
+    def _remove_selected_from_folder(self):
+        for card in self._cards:
+            if card.note_id in self._selected_ids and card._in_folder:
+                self._repo.remove_note_from_folder(card.note_id)
+        self._load_notes()
+
     def _delete_folder(self, folder_id: int):
-        child_count = self._repo.get_folder_child_count(folder_id)
-        if child_count > 0:
-            reply = QMessageBox.question(
-                self, "Удалить папку",
-                f"В папке {child_count} замет(ок).\n"
-                "Папка будет удалена навсегда, заметки — перенесены в корзину.\n\n"
-                "Удалить?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            if reply != QMessageBox.StandardButton.Yes:
-                return
-        base_path = self._folder_path(folder_id)
-        self._delete_folder_permanent(folder_id, base_path)
+        self._delete_items([folder_id])
+
+    def _delete_selected(self):
+        if not self._selected_ids:
+            return
+        self._delete_items(list(self._selected_ids))
+
+    def _delete_items(self, ids: list[int]):
+        if not ids:
+            return
+
+        folders = []
+        notes = []
+        for nid in ids:
+            n = self._repo.get_note(nid)
+            if n and n.type == "folder":
+                folders.append(n)
+            elif n:
+                notes.append(n)
+
+        parts = []
+        if notes:
+            parts.append(f"{len(notes)} замет(ок)" if len(notes) > 1 else "заметку")
+        if folders:
+            parts.append(f"{len(folders)} пап(ок)" if len(folders) > 1 else "папку")
+        msg = f"Удалить {' и '.join(parts)}?\n"
+        if folders:
+            msg += "Папки будут удалены навсегда, содержимое — перенесено в корзину.\n"
+        if notes:
+            msg += "Заметки будут перенесены в корзину."
+
+        reply = QMessageBox.question(
+            self, "Удаление", msg,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        for folder in folders:
+            base_path = self._folder_path(folder.id)
+            self._delete_folder_permanent(folder.id, base_path)
+        for n in notes:
+            self._repo.soft_delete_note(n.id)
+
+        self._selected_ids.clear()
         self._load_notes()
 
     def _folder_path(self, folder_id: int) -> str:
@@ -319,8 +437,8 @@ class MainWindow(QMainWindow):
             self._open_folder(note_id)
             return
         dialog = DetailDialog(note, self._repo, parent=self)
-        if dialog.exec():
-            self._load_notes()
+        dialog.exec()
+        self._load_notes()
 
     def _on_search(self, text: str, note_type: str):
         self._current_filter.pop("search", None)
@@ -361,6 +479,183 @@ class MainWindow(QMainWindow):
                 self._load_notes()
 
     def _show_export(self):
+        from ui.export_dialog import ExportDialog
+        dialog = ExportDialog(self._repo, parent=self)
+        dialog.exec()
+        self._load_notes()
+
+    def _setup_menu_bar(self):
+        menu_bar = self.menuBar()
+
+        file_menu = menu_bar.addMenu("Файл")
+
+        import_action = file_menu.addAction("Импорт...")
+        import_action.triggered.connect(self._show_import)
+        export_action = file_menu.addAction("Экспорт...")
+        export_action.triggered.connect(self._show_export)
+        file_menu.addSeparator()
+        backup_action = file_menu.addAction("Создать резервную копию...")
+        backup_action.triggered.connect(self._backup_db)
+        file_menu.addSeparator()
+        exit_action = file_menu.addAction("Выход")
+        exit_action.setShortcut(QKeySequence("Alt+F4"))
+        exit_action.triggered.connect(QApplication.quit)
+
+        edit_menu = menu_bar.addMenu("Правка")
+        select_all_action = edit_menu.addAction("Выделить все")
+        select_all_action.setShortcut(QKeySequence("Ctrl+A"))
+        select_all_action.triggered.connect(self._select_all)
+        deselect_action = edit_menu.addAction("Снять выделение")
+        deselect_action.setShortcut(QKeySequence("Escape"))
+        deselect_action.triggered.connect(self._clear_selection)
+        edit_menu.addSeparator()
+        find_replace_action = edit_menu.addAction("Найти и заменить...")
+        find_replace_action.setShortcut(QKeySequence("Ctrl+H"))
+        find_replace_action.triggered.connect(self._show_find_replace)
+
+        notes_menu = menu_bar.addMenu("Заметки")
+
+        add_menu = notes_menu.addMenu("Добавить")
+        for note_type, label in _NOTE_TYPES:
+            action = add_menu.addAction(label)
+            action.setData(note_type)
+            action.triggered.connect(self._on_new_note_action)
+
+        notes_menu.addSeparator()
+
+        self._open_selected_action = notes_menu.addAction("Открыть")
+        self._open_selected_action.triggered.connect(self._open_selected)
+        self._pin_selected_action = notes_menu.addAction("Закрепить / Открепить")
+        self._pin_selected_action.triggered.connect(self._toggle_pin_selected)
+        duplicate_action = notes_menu.addAction("Дублировать")
+        duplicate_action.setShortcut(QKeySequence("Ctrl+D"))
+        duplicate_action.triggered.connect(self._duplicate_selected)
+        move_action = notes_menu.addAction("Переместить в папку...")
+        move_action.triggered.connect(self._move_to_folder)
+        self._delete_selected_action = notes_menu.addAction("В корзину")
+        self._delete_selected_action.setShortcut(QKeySequence("Delete"))
+        self._delete_selected_action.triggered.connect(self._delete_selected)
+
+        notes_menu.addSeparator()
+
+        all_notes_action = notes_menu.addAction("Все заметки")
+        all_notes_action.triggered.connect(self._on_all_notes)
+        trash_action = notes_menu.addAction("Корзина...")
+        trash_action.triggered.connect(self._show_trash)
+
+        view_menu = menu_bar.addMenu("Вид")
+        calendar_action = view_menu.addAction("Календарь...")
+        calendar_action.triggered.connect(self._show_calendar)
+        refresh_action = view_menu.addAction("Обновить")
+        refresh_action.setShortcut(QKeySequence("Ctrl+R"))
+        refresh_action.triggered.connect(self._load_notes)
+        view_menu.addSeparator()
+        self._theme_action = view_menu.addAction("Светлая тема")
+        self._theme_action.setCheckable(True)
+        self._theme_action.triggered.connect(self._toggle_theme)
+        self._sidebar_toggle = view_menu.addAction("Боковая панель")
+        self._sidebar_toggle.setCheckable(True)
+        self._sidebar_toggle.setChecked(True)
+        self._sidebar_toggle.triggered.connect(self._toggle_sidebar)
+
+        help_menu = menu_bar.addMenu("Помощь")
+        about_action = help_menu.addAction("О программе")
+        about_action.triggered.connect(self._show_about)
+
+    def _init_theme_state(self):
+        from main import current_theme
+        self._theme_action.setChecked(current_theme() == "light")
+
+    def _open_selected(self):
+        for note_id in list(self._selected_ids):
+            self._open_note(note_id)
+
+    def _toggle_pin_selected(self):
+        for note_id in list(self._selected_ids):
+            note = self._repo.get_note(note_id)
+            if note:
+                note.is_pinned = 0 if note.is_pinned else 1
+                self._repo.update_note(note)
+        self._load_notes()
+
+    def _backup_db(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Резервная копия", "mnotes_backup.db",
+            "SQLite (*.db);;Все файлы (*)",
+        )
+        if not path:
+            return
+        import shutil
+        try:
+            self._repo._conn.execute("PRAGMA wal_checkpoint(FULL)")
+            shutil.copy2(str(DB_PATH), path)
+            QMessageBox.information(self, "Резервная копия", f"База данных сохранена:\n{path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать копию:\n{e}")
+
+    def _move_to_folder(self):
+        if not self._selected_ids:
+            return
+        from ui.folder_picker_dialog import FolderPickerDialog
+        exclude = set()
+        for nid in self._selected_ids:
+            n = self._repo.get_note(nid)
+            if n and n.type == "folder":
+                exclude.add(n.id)
+        dialog = FolderPickerDialog(self._repo, exclude_ids=exclude, parent=self)
+        if dialog.exec():
+            for nid in list(self._selected_ids):
+                if dialog.selected_folder_id == 0:
+                    self._repo.remove_note_from_folder(nid)
+                else:
+                    self._repo.move_note_to_folder(nid, dialog.selected_folder_id)
+            self._load_notes()
+
+    def _duplicate_selected(self):
+        if not self._selected_ids:
+            return
+        for nid in list(self._selected_ids):
+            self._repo.duplicate_note(nid)
+        self._load_notes()
+
+    def _toggle_theme(self, checked: bool):
+        theme = "light" if checked else "dark"
+        from main import load_theme, set_theme
+        set_theme(theme)
+        load_theme(QApplication.instance(), theme)
+
+    def _show_find_replace(self):
+        text_ids = []
+        for nid in self._selected_ids:
+            n = self._repo.get_note(nid)
+            if n and n.type in ("text", "markdown", "richtext"):
+                text_ids.append(nid)
+        if not text_ids:
+            QMessageBox.information(
+                self, "Найти и заменить",
+                "Выделите текстовые заметки (текст, Markdown, форматирование).",
+            )
+            return
+        from ui.find_replace_dialog import FindReplaceDialog
+        dialog = FindReplaceDialog(self._repo, text_ids, parent=self)
+        dialog.exec()
+        if dialog.replaced_count > 0:
+            self._load_notes()
+
+    def _toggle_sidebar(self, checked: bool):
+        self._sidebar.setVisible(checked)
+
+    def _show_about(self):
+        QMessageBox.about(
+            self, "О программе",
+            "<h3>MNotes</h3>"
+            "<p>Десктопное приложение для управления заметками.</p>"
+            "<p>Поддерживаемые типы: текст, Markdown, форматирование, "
+            "списки, таблицы, аудио, изображения, папки.</p>"
+            "<p>Шифрование: AES-256-GCM</p>"
+        )
+
+    def _show_import(self):
         from ui.export_dialog import ExportDialog
         dialog = ExportDialog(self._repo, parent=self)
         dialog.exec()

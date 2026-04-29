@@ -15,6 +15,7 @@ class Repository:
         return self._db.connection
 
     def create_note(self, note: Note) -> int:
+        pid = note.parent_id if note.parent_id else None
         cur = self._conn.execute(
             """INSERT INTO notes (title, type, content, category_id, is_pinned,
                is_deleted, is_encrypted, password_hash, reminder_at, reminder_repeat,
@@ -24,7 +25,7 @@ class Repository:
                 note.title, note.type, note.content, note.category_id,
                 note.is_pinned, note.is_deleted, note.is_encrypted,
                 note.password_hash, note.reminder_at, note.reminder_repeat,
-                note.sort_order, note.parent_id,
+                note.sort_order, pid,
             ),
         )
         self._conn.commit()
@@ -93,6 +94,7 @@ class Repository:
         return notes
 
     def update_note(self, note: Note) -> None:
+        pid = note.parent_id if note.parent_id else None
         self._conn.execute(
             """UPDATE notes SET title=?, type=?, content=?, category_id=?,
                is_pinned=?, is_deleted=?, is_encrypted=?, password_hash=?,
@@ -103,7 +105,7 @@ class Repository:
                 note.title, note.type, note.content, note.category_id,
                 note.is_pinned, note.is_deleted, note.is_encrypted,
                 note.password_hash, note.reminder_at, note.reminder_repeat,
-                note.sort_order, note.parent_id, note.id,
+                note.sort_order, pid, note.id,
             ),
         )
         self._conn.commit()
@@ -243,3 +245,25 @@ class Repository:
                ORDER BY reminder_at"""
         ).fetchall()
         return [Note.from_row(r) for r in rows]
+
+    def get_all_folders(self) -> list[Note]:
+        rows = self._conn.execute(
+            "SELECT * FROM notes WHERE type='folder' AND is_deleted=0 ORDER BY title"
+        ).fetchall()
+        return [Note.from_row(r) for r in rows]
+
+    def duplicate_note(self, note_id: int) -> int | None:
+        row = self._conn.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
+        if row is None:
+            return None
+        pid = row["parent_id"] if row["parent_id"] else None
+        cur = self._conn.execute(
+            """INSERT INTO notes (title, type, content, category_id, is_pinned,
+               is_deleted, is_encrypted, password_hash, reminder_at, reminder_repeat,
+               sort_order, parent_id)
+               VALUES (?, ?, ?, ?, 0, 0, 0, NULL, NULL, NULL, 0, ?)""",
+            (row["title"] + " (копия)", row["type"], row["content"],
+             row["category_id"], pid),
+        )
+        self._conn.commit()
+        return cur.lastrowid

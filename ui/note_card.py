@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QMenu
 from PyQt6.QtCore import Qt, pyqtSignal, QMimeData
-from PyQt6.QtGui import QPixmap, QPainter, QColor, QPen, QDrag
+from PyQt6.QtGui import QPixmap, QPainter, QColor, QPen, QDrag, QBrush
 
 
 def _create_table_icon(size: int = 16) -> QPixmap:
@@ -28,6 +28,8 @@ def _create_table_icon(size: int = 16) -> QPixmap:
 
 class NoteCard(QWidget):
     double_clicked = pyqtSignal(int)
+    clicked = pyqtSignal(int, bool)
+    context_menu_requested = pyqtSignal(int, object)
     remove_from_folder = pyqtSignal(int)
     rename_folder = pyqtSignal(int)
     delete_folder = pyqtSignal(int)
@@ -42,6 +44,7 @@ class NoteCard(QWidget):
         self.note_type = note_type
         self.title = title
         self._in_folder = in_folder
+        self._selected = False
         self.setFixedSize(210, 210)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setObjectName("noteCard")
@@ -101,10 +104,13 @@ class NoteCard(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.RightButton:
-            self._show_context_menu(event.globalPosition().toPoint() if hasattr(event, 'globalPosition') else event.globalPos())
+            pos = event.globalPosition().toPoint() if hasattr(event, 'globalPosition') else event.globalPos()
+            self.context_menu_requested.emit(self.note_id, pos)
             return
         if event.button() == Qt.MouseButton.LeftButton:
             self._drag_start_pos = event.position().toPoint() if hasattr(event, 'position') else event.pos()
+            ctrl = bool(event.modifiers() & Qt.KeyboardModifier.ControlModifier)
+            self.clicked.emit(self.note_id, ctrl)
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
@@ -164,13 +170,21 @@ class NoteCard(QWidget):
                 return True
         return False
 
-    def _show_context_menu(self, pos):
-        menu = QMenu(self)
-        if self.note_type == "folder":
-            menu.addAction("Переименовать", lambda: self.rename_folder.emit(self.note_id))
-            menu.addAction("Удалить папку", lambda: self.delete_folder.emit(self.note_id))
-        if self._in_folder:
-            menu.addSeparator()
-            menu.addAction("Убрать из папки", lambda: self.remove_from_folder.emit(self.note_id))
-        if self.note_type == "folder" or self._in_folder:
-            menu.exec(pos)
+    def set_selected(self, selected: bool):
+        if self._selected == selected:
+            return
+        self._selected = selected
+        self.update()
+
+    def is_selected(self) -> bool:
+        return self._selected
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if self._selected:
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.setPen(QPen(QColor("#89b4fa"), 3))
+            painter.setBrush(QBrush(QColor(137, 180, 250, 40)))
+            painter.drawRoundedRect(1, 1, self.width() - 2, self.height() - 2, 8, 8)
+            painter.end()

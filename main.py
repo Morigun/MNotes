@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
 from PyQt6.QtGui import QFont, QAction, QIcon
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QSettings
 
 from database.db_manager import DatabaseManager
 from database.repository import Repository
@@ -13,11 +13,26 @@ from ui.main_window import MainWindow
 
 APP_DIR = Path(__file__).parent
 
+THEMES = {
+    "dark": APP_DIR / "resources" / "style.qss",
+    "light": APP_DIR / "resources" / "style_light.qss",
+}
 
-def load_stylesheet(app: QApplication) -> None:
-    qss_path = APP_DIR / "resources" / "style.qss"
+
+def load_theme(app: QApplication, theme: str = "dark") -> None:
+    qss_path = THEMES.get(theme, THEMES["dark"])
     if qss_path.exists():
         app.setStyleSheet(qss_path.read_text(encoding="utf-8"))
+
+
+def current_theme() -> str:
+    settings = QSettings("MNotes", "MNotes")
+    return settings.value("theme", "dark")
+
+
+def set_theme(theme: str) -> None:
+    settings = QSettings("MNotes", "MNotes")
+    settings.setValue("theme", theme)
 
 
 def main():
@@ -35,7 +50,7 @@ def main():
     app_icon = QIcon(str(APP_DIR / "app.ico"))
     app.setWindowIcon(app_icon)
 
-    load_stylesheet(app)
+    load_theme(app, current_theme())
 
     db = DatabaseManager()
     db.init_db()
