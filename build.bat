@@ -1,5 +1,7 @@
 @echo off
 
+taskkill /IM MNotes.exe /F >nul 2>&1
+
 if not exist ".venv\Scripts\activate.bat" (
     echo Creating venv...
     python -m venv .venv
