@@ -35,6 +35,19 @@ def set_theme(theme: str) -> None:
     settings.setValue("theme", theme)
 
 
+def apply_titlebar_theme(widget, dark: bool) -> None:
+    try:
+        hwnd = int(widget.winId())
+        DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+        value = ctypes.c_int(1 if dark else 0)
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE,
+            ctypes.byref(value), ctypes.sizeof(value),
+        )
+    except Exception:
+        pass
+
+
 def main():
     try:
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("MNotes")

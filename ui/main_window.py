@@ -46,7 +46,21 @@ class MainWindow(QMainWindow):
         self._setup_menu_bar()
         self._init_theme_state()
         self._setup_actions()
+        self._apply_titlebar()
         self._load_notes()
+
+    def _is_dark_theme(self) -> bool:
+        from main import current_theme
+        return current_theme() == "dark"
+
+    def _apply_titlebar(self):
+        from main import apply_titlebar_theme
+        apply_titlebar_theme(self, self._is_dark_theme())
+
+    def _exec_dialog(self, dialog):
+        from main import apply_titlebar_theme
+        apply_titlebar_theme(dialog, self._is_dark_theme())
+        return dialog.exec()
 
     def _setup_ui(self):
         central = QWidget()
@@ -437,7 +451,7 @@ class MainWindow(QMainWindow):
             self._open_folder(note_id)
             return
         dialog = DetailDialog(note, self._repo, parent=self)
-        dialog.exec()
+        self._exec_dialog(dialog)
         self._load_notes()
 
     def _on_search(self, text: str, note_type: str):
@@ -467,13 +481,13 @@ class MainWindow(QMainWindow):
     def _show_trash(self):
         from ui.trash_view import TrashView
         dialog = TrashView(self._repo, parent=self)
-        if dialog.exec():
+        if self._exec_dialog(dialog):
             self._load_notes()
 
     def _show_calendar(self):
         from ui.calendar_widget import CalendarWidget
         dialog = CalendarWidget(self._repo, parent=self)
-        if dialog.exec():
+        if self._exec_dialog(dialog):
             if dialog.selected_date:
                 self._current_filter = {"date": dialog.selected_date}
                 self._load_notes()
@@ -481,7 +495,7 @@ class MainWindow(QMainWindow):
     def _show_export(self):
         from ui.export_dialog import ExportDialog
         dialog = ExportDialog(self._repo, parent=self)
-        dialog.exec()
+        self._exec_dialog(dialog)
         self._load_notes()
 
     def _setup_menu_bar(self):
@@ -603,7 +617,7 @@ class MainWindow(QMainWindow):
             if n and n.type == "folder":
                 exclude.add(n.id)
         dialog = FolderPickerDialog(self._repo, exclude_ids=exclude, parent=self)
-        if dialog.exec():
+        if self._exec_dialog(dialog):
             for nid in list(self._selected_ids):
                 if dialog.selected_folder_id == 0:
                     self._repo.remove_note_from_folder(nid)
@@ -623,6 +637,7 @@ class MainWindow(QMainWindow):
         from main import load_theme, set_theme
         set_theme(theme)
         load_theme(QApplication.instance(), theme)
+        self._apply_titlebar()
 
     def _show_find_replace(self):
         text_ids = []
@@ -638,7 +653,7 @@ class MainWindow(QMainWindow):
             return
         from ui.find_replace_dialog import FindReplaceDialog
         dialog = FindReplaceDialog(self._repo, text_ids, parent=self)
-        dialog.exec()
+        self._exec_dialog(dialog)
         if dialog.replaced_count > 0:
             self._load_notes()
 
@@ -658,7 +673,7 @@ class MainWindow(QMainWindow):
     def _show_import(self):
         from ui.export_dialog import ExportDialog
         dialog = ExportDialog(self._repo, parent=self)
-        dialog.exec()
+        self._exec_dialog(dialog)
         self._load_notes()
 
     def _setup_actions(self):
