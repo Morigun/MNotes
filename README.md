@@ -21,7 +21,10 @@
 
 ## Скриншоты
 
-...
+<img width="1202" height="832" alt="image" src="https://github.com/user-attachments/assets/0b7d9f42-9bbf-46f4-a24c-a3888c9f9877" />
+<img width="902" height="682" alt="image" src="https://github.com/user-attachments/assets/39ea63f1-9d77-4326-b81f-b968c42756ed" />
+<img width="502" height="220" alt="image" src="https://github.com/user-attachments/assets/7000ac02-7406-41ca-b689-55c92c2355f9" />
+
 
 ## Требования
 
