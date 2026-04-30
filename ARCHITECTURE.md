@@ -2,7 +2,7 @@
 
 ## Обзор
 
-MNotes — десктопное приложение для управления заметками, написанное на Python с использованием фреймворка PyQt6. Поддерживает 8 типов заметок, шифрование AES-256-GCM, напоминания, папки с drag-and-drop навигацией, корзину с восстановлением, экспорт/импорт, тёмную и светлую темы, системный трей.
+MNotes — десктопное приложение для управления заметками, написанное на Python с использованием фреймворка PyQt6. Поддерживает 8 типов заметок, шифрование AES-256-GCM, напоминания, папки с drag-and-drop навигацией, корзину с восстановлением, экспорт/импорт, тёмную и светлую темы, системный трей, систему плагинов.
 
 ## Технологический стек
 
@@ -15,55 +15,84 @@ MNotes — десктопное приложение для управления
 | Markdown        | markdown2                   |
 | Изображения     | Pillow                      |
 | Аудио           | PyQt6 Multimedia            |
+| Плагины         | Собственная система (importlib + plugin.json) |
 
 ## Структура каталогов
 
 ```
 MNotes/
-├── main.py                  # Точка входа, темы, заголовки окон
-├── requirements.txt         # Зависимости
-├── run.bat                  # Скрипт запуска (Windows)
-├── app.ico                  # Иконка приложения
-├── mnotes.db                # База данных SQLite
-├── resources/
-│   ├── style.qss            # Тёмная тема (Catppuccin Mocha)
-│   └── style_light.qss      # Светлая тема (Catppuccin Latte)
-├── database/
-│   ├── db_manager.py        # Подключение к БД, миграции
-│   ├── repository.py        # Data-access слой (CRUD)
-│   └── models.py            # Data-модели (Note, Category, Tag)
-├── services/
-│   ├── crypto_service.py    # Шифрование и хеширование
-│   ├── export_service.py    # Экспорт/импорт заметок
-│   └── reminder_service.py  # Сервис напоминаний (QTimer)
-└── ui/
-    ├── main_window.py       # Главное окно с меню, выделением, навигацией
-    ├── sidebar.py           # Боковая панель (категории, теги)
-    ├── search_bar.py        # Поиск с фильтром по типу
-    ├── notes_grid.py        # FlowLayout для карточек
-    ├── note_card.py         # Карточка заметки (drag-and-drop, выделение)
-    ├── detail_dialog.py     # Диалог редактирования заметки
-    ├── trash_view.py        # Корзина с восстановлением папок
-    ├── calendar_widget.py   # Календарь с подсветкой дат
-    ├── export_dialog.py     # Диалог экспорта/импорта
-    ├── notification_popup.py# Всплывающее уведомление с анимацией
-    ├── folder_picker_dialog.py # Диалог выбора папки (дерево)
-    ├── find_replace_dialog.py  # Поиск и замена в текстовых заметках
-    └── editors/
-        ├── base_editor.py   # Абстрактный класс редактора
-        ├── text_editor.py   # Текстовый редактор
-        ├── markdown_editor.py # Markdown с превью
-        ├── richtext_editor.py # WYSIWYG-редактор (HTML)
-        ├── list_editor.py   # Список задач (чекбоксы)
-        ├── table_editor.py  # Таблица (QTableWidget)
-        ├── audio_editor.py  # Запись/воспроизведение аудио
-        ├── image_editor.py  # Загрузка/поворот изображений
-        └── folder_editor.py # Папка (контейнер)
+├── .gitignore
+├── README.md
+├── ARCHITECTURE.md
+├── MainApp/                          # Основное приложение
+│   ├── main.py                       # Точка входа, темы, заголовки окон
+│   ├── requirements.txt              # Зависимости приложения
+│   ├── run.bat                       # Скрипт запуска (Windows)
+│   ├── build.bat                     # Сборка PyInstaller EXE
+│   ├── app.ico                       # Иконка приложения
+│   ├── database/
+│   │   ├── __init__.py
+│   │   ├── db_manager.py             # Подключение к БД, миграции
+│   │   ├── repository.py             # Data-access слой (CRUD)
+│   │   └── models.py                 # Data-модели (Note, Category, Tag)
+│   ├── plugins/
+│   │   ├── __init__.py
+│   │   ├── plugin_base.py            # Абстрактный базовый класс плагина
+│   │   └── plugin_manager.py         # Обнаружение, загрузка, реестр плагинов
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── crypto_service.py         # Шифрование и хеширование
+│   │   ├── export_service.py         # Экспорт/импорт заметок
+│   │   └── reminder_service.py       # Сервис напоминаний (QTimer)
+│   ├── ui/
+│   │   ├── __init__.py
+│   │   ├── main_window.py            # Главное окно с меню, выделением, навигацией
+│   │   ├── sidebar.py                # Боковая панель (категории, теги)
+│   │   ├── search_bar.py             # Поиск с фильтром по типу
+│   │   ├── notes_grid.py             # FlowLayout для карточек
+│   │   ├── note_card.py              # Карточка заметки (drag-and-drop, выделение)
+│   │   ├── detail_dialog.py          # Диалог редактирования заметки
+│   │   ├── trash_view.py             # Корзина с восстановлением папок
+│   │   ├── calendar_widget.py        # Календарь с подсветкой дат
+│   │   ├── export_dialog.py          # Диалог экспорта/импорта
+│   │   ├── notification_popup.py     # Всплывающее уведомление с анимацией
+│   │   ├── folder_picker_dialog.py   # Диалог выбора папки (дерево)
+│   │   ├── find_replace_dialog.py    # Поиск и замена в текстовых заметках
+│   │   ├── settings_dialog.py        # Диалог настроек (вкладка плагинов)
+│   │   └── editors/
+│   │       ├── __init__.py
+│   │       ├── base_editor.py        # Абстрактный класс редактора
+│   │       ├── text_editor.py        # Текстовый редактор
+│   │       ├── markdown_editor.py    # Markdown с превью
+│   │       ├── richtext_editor.py    # WYSIWYG-редактор (HTML)
+│   │       ├── list_editor.py        # Список задач (чекбоксы)
+│   │       ├── table_editor.py       # Таблица (QTableWidget)
+│   │       ├── audio_editor.py       # Запись/воспроизведение аудио
+│   │       ├── image_editor.py       # Загрузка/поворот изображений
+│   │       └── folder_editor.py      # Папка (контейнер)
+│   └── resources/
+│       ├── style.qss                 # Тёмная тема (Catppuccin Mocha)
+│       └── style_light.qss           # Светлая тема (Catppuccin Latte)
+└── Plugins/                          # Плагины (каждый в своей папке)
+    └── speech2text/
+        ├── __init__.py               # Точка входа: класс Plugin(PluginBase)
+        ├── plugin.json               # Манифест (имя, версия, зависимости)
+        ├── stt_service.py            # Транскрибация: загрузка модели, распознавание
+        ├── vosk_shim.py              # FFI-обёртка libvosk.dll (cffi)
+        ├── settings.py               # Настройки пути к модели (QSettings)
+        ├── build.py                  # Сборка дистрибутива плагина
+        ├── build.bat                 # Запуск сборки
+        ├── requirements.txt          # Зависимости плагина (vosk)
+        ├── settings.py               # Виджет настроек модели
+        └── vosk/                     # Модели Vosk (в .gitignore)
+            ├── model/                # Полная модель (ru, ~3 ГБ)
+            ├── small-model/          # Урезанная модель (~60 МБ)
+            └── recasepunc/           # Модель восстановления пунктуации
 ```
 
 ## Слои архитектуры
 
-### 1. Database (database/)
+### 1. Database (MainApp/database/)
 
 **DatabaseManager** (`db_manager.py`) — Singleton-обёртка над SQLite:
 - Управляет единственным соединением
@@ -86,7 +115,43 @@ MNotes/
 - `Category` — категория с цветом
 - `Tag` — тег
 
-### 2. Services (services/)
+### 2. Plugin System (MainApp/plugins/)
+
+**PluginBase** (`plugin_base.py`) — абстрактный базовый класс:
+- `name` (str) — идентификатор плагина
+- `description` (str) — описание
+- `is_available()` — проверка доступности (по умолчанию `True`)
+- `on_load()` — вызывается при загрузке плагина
+- `on_unload()` — вызывается при выгрузке
+- `get_settings_widget(parent)` — возвращает QWidget с настройками (опционально)
+
+**PluginManager** (`plugin_manager.py`) — обнаружение и управление:
+- Обнаружение: сканирует `MainApp/plugins/` и `dist/plugins/` (для EXE) на наличие `plugin.json`
+- Загрузка: `importlib.util` для динамического импорта, изоляция через `sys.path` и `__package__`
+- Реестр: словарь `_plugins: dict[str, object]`, загруженные плагины по имени
+- Расширение редакторов: `register_editor_action(editor_type, label, handler)` / `get_editor_actions(editor_type)` — плагины могут добавлять кнопки в редакторы
+- API: `discover_plugins()`, `load_plugin()`, `load_all_plugins()`, `get_plugin()`, `loaded_plugins()`, `plugin_info()`
+
+**Жизненный цикл плагина**:
+1. `MainWindow.__init__()` → `_load_plugins()` → `load_all_plugins()`
+2. `plugin_manager` сканирует директории, находит папки с `plugin.json`
+3. Для каждого плагина: `importlib` загружает `__init__.py`, создаёт экземпляр `Plugin`
+4. Вызывается `plugin.on_load()` — плагин регистрирует действия через `register_editor_action()`
+5. Редакторы при инициализации вызывают `get_editor_actions(type)` и создают кнопки
+6. `SettingsDialog` отображает список плагинов и их настройки
+
+**Манифест плагина** (`plugin.json`):
+```json
+{
+    "name": "plugin-name",
+    "version": "1.0.0",
+    "description": "Описание",
+    "requires": ["vosk"],
+    "optional": ["torch", "transformers"]
+}
+```
+
+### 3. Services (MainApp/services/)
 
 **CryptoService** (`crypto_service.py`):
 - Хеширование паролей: Argon2
@@ -105,7 +170,7 @@ MNotes/
 - Повторяющиеся напоминания: daily, weekly, monthly, yearly
 - Автоматический сдвиг `reminder_at` при повторяющихся напоминаниях
 
-### 3. UI (ui/)
+### 4. UI (MainApp/ui/)
 
 **MainWindow** (`main_window.py`) — главное окно:
 - Верхнее меню: Файл, Правка, Заметки, Вид, Помощь
@@ -116,6 +181,7 @@ MNotes/
 - Единая логика удаления `_delete_items`: папки — перманентно (дети → корзина с путём), заметки — мягкое удаление
 - Горячие клавиши: Ctrl+N, Ctrl+F, Ctrl+H, Ctrl+D, Ctrl+A, Ctrl+R, Delete, Escape, Alt+F4
 - Применение темы заголовка окна через DWM API (`_apply_titlebar`, `_exec_dialog`)
+- Загрузка плагинов при инициализации (`_load_plugins` → `load_all_plugins`)
 - Закрытие окна скрывает в трей (`closeEvent` → `hide`)
 
 **Sidebar** (`sidebar.py`) — боковая панель:
@@ -159,9 +225,47 @@ MNotes/
 - Работает с text/markdown/richtext заметками
 - Подсчёт заменённых вхождений
 
+**SettingsDialog** (`settings_dialog.py`) — настройки приложения:
+- Вкладка «Плагины»: список обнаруженных плагинов с состоянием (загружен/не доступен)
+- Динамические вкладки: каждый плагин с `get_settings_widget()` получает свою вкладку
+- Использует `discover_plugins()`, `plugin_info()`, `loaded_plugins()` из `plugin_manager`
+
 **Редакторы** (`ui/editors/`):
 - `BaseEditor` — абстрактный класс с методами `get_content()`, `set_content()`, `clear()`
 - Каждый редактор реализует свой интерфейс для конкретного типа данных
+- Редакторы могут расширяться плагинами через `get_editor_actions(type)` — кнопки добавляются в интерфейс редактора
+
+### 5. Plugins (Plugins/)
+
+#### speech2text — распознавание речи
+
+**Plugin** (`__init__.py`) — реализация `PluginBase`:
+- При загрузке (`on_load`) регистрирует действие `register_editor_action("audio", "📝 В текст", ...)` для аудиоредактора
+- Обработчик `_on_transcribe`: получает WAV из редактора, вызывает `transcribe()`, создаёт текстовую заметку
+- Предоставляет виджет настроек (`_STTSettingsWidget`): выбор папки с моделями, выбор модели, отображение размера
+
+**stt_service.py** — сервис транскрибации:
+- `ensure_model()` — автоматическая загрузка модели vosk-model-small-ru (если отсутствует)
+- `transcribe(wav_path)` — распознавание речи: загрузка модели, чтение WAV, ресемплинг (audioop), поблочное распознавание
+- `_restore_punctuation(text)` — восстановление пунктуации через recasepunc (опционально, требует torch)
+
+**vosk_shim.py** — FFI-обёртка поверх `libvosk.dll`:
+- Использует `cffi` для прямого вызова C-API Vosk
+- Загружает DLL из подпапки `lib/` плагина
+- Классы: `Model`, `KaldiRecognizer`, `SpkModel`
+- Обёрнуты все основные методы: `AcceptWaveform`, `Result`, `PartialResult`, `FinalResult`, `SetWords`, `SetGrammar` и др.
+
+**settings.py** — управление настройками:
+- Использует `QSettings("MNotes", "MNotes")` для хранения путей
+- `stt_model_path()` — путь к текущей модели (QSettings → fallback: `vosk/small-model`)
+- `stt_vosk_dir()` — папка с моделями (QSettings → fallback: `vosk/`)
+- `available_models()` — список моделей (папки с подпапкой `am/`)
+- Поддержка frozen-режима (PyInstaller EXE)
+
+**build.py** — сборка дистрибутива:
+- Компилирует `.py` → `.pyc`, копирует `plugin.json`
+- Копирует `libvosk.dll` и зависимости из pip-пакета vosk
+- Результат: `dist/plugins/speech2text/`
 
 ## Схема базы данных
 
@@ -172,19 +276,19 @@ categories          tags                notes
 │ name        │    │ name        │    │ title                │
 │ color       │    └─────────────┘    │ type                 │
 └─────────────┘                       │ content (BLOB)       │
-                                      │ category_id (FK)     │
-         note_tags                    │ is_pinned            │
-    ┌──────────────────┐              │ is_deleted           │
-    │ note_id (FK, PK) │◄─────────────│ is_encrypted         │
-    │ tag_id  (FK, PK) │──►tags       │ password_hash        │
-    └──────────────────┘              │ created_at           │
-                                      │ updated_at           │
-                                      │ reminder_at          │
-                                      │ reminder_repeat      │
-                                      │ sort_order           │
-                                      │ parent_id (FK)──────►│ (self-ref)
-                                      │ deleted_parent_name  │
-                                      └──────────────────────┘
+                                       │ category_id (FK)     │
+          note_tags                    │ is_pinned            │
+     ┌──────────────────┐              │ is_deleted           │
+     │ note_id (FK, PK) │◄─────────────│ is_encrypted         │
+     │ tag_id  (FK, PK) │──►tags       │ password_hash        │
+     └──────────────────┘              │ created_at           │
+                                       │ updated_at           │
+                                       │ reminder_at          │
+                                       │ reminder_repeat      │
+                                       │ sort_order           │
+                                       │ parent_id (FK)──────►│ (self-ref)
+                                       │ deleted_parent_name  │
+                                       └──────────────────────┘
 
 Индексы: idx_notes_type, idx_notes_deleted, idx_notes_reminder,
          idx_notes_category, idx_notes_updated, idx_notes_parent
@@ -259,6 +363,7 @@ categories          tags                notes
 - **Singleton** — DatabaseManager гарантирует одно соединение
 - **Repository** — инкапсуляция SQL-запросов
 - **Strategy** — выбор редактора через `_EDITOR_MAP` по типу заметки
+- **Plugin** — расширение через `PluginBase` + `plugin_manager`, динамическая загрузка через `importlib`
 - **Observer (Signal/Slot)** — связь между UI-компонентами через PyQt6 signals
 - **Soft Delete** — заметки помечаются `is_deleted=1`, а не удаляются физически
 - **Папки** — self-referencing FK (`parent_id → notes.id`), рекурсивное удаление с сохранением пути
@@ -276,3 +381,23 @@ categories          tags                notes
 - `closeEvent` → `hide()` — окно скрывается в трей
 - Меню трея: Показать, Новая заметка, Выход
 - Двойной клик по иконке → восстановление окна
+
+## Сборка и дистрибуция
+
+### Основное приложение (PyInstaller)
+
+```batch
+cd MainApp
+build.bat
+```
+
+Результат: `MainApp/dist/MNotes.exe` — автономный EXE со встроенными ресурсами и плагинами.
+
+### Плагин speech2text
+
+```batch
+cd Plugins/speech2text
+build.bat
+```
+
+Результат: `Plugins/speech2text/dist/plugins/speech2text/` — скомпилированный плагин с DLL, копируется в `dist/plugins/` рядом с EXE.
