@@ -11,3 +11,5 @@ dist/
 vosk/
 plugins/speech2text/recasepunc/checkpoint
 .kilo/
+installer_output/
+.wix/

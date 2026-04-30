@@ -5,7 +5,9 @@ from pathlib import Path
 
 def _db_path() -> Path:
     if getattr(sys, 'frozen', False):
-        return Path(sys.executable).parent / "mnotes.db"
+        app_data = Path.home() / "AppData" / "Local" / "MNotes"
+        app_data.mkdir(parents=True, exist_ok=True)
+        return app_data / "mnotes.db"
     return Path(__file__).resolve().parent.parent / "mnotes.db"
 
 
