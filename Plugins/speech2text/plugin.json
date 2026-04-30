@@ -1,0 +1,7 @@
+{
+    "name": "speech2text",
+    "version": "1.0.0",
+    "description": "Распознавание речи (Vosk). Перевод аудиозаметок в текст.",
+    "requires": ["vosk"],
+    "optional": ["torch", "transformers"]
+}

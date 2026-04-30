@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 
 taskkill /IM MNotes.exe /F >nul 2>&1
 
@@ -22,12 +23,18 @@ if errorlevel 1 (
     exit /b 1
 )
 
+echo.
 echo Building MNotes.exe ...
+
 pyinstaller --noconfirm --onefile --windowed ^
     --name "MNotes" ^
     --icon="app.ico" ^
     --add-data "resources;resources" ^
     --add-data "app.ico;." ^
+    --hidden-import=plugins.plugin_base ^
+    --exclude-module torch ^
+    --exclude-module transformers ^
+    --exclude-module vosk ^
     main.py
 
 if errorlevel 1 (

@@ -5,6 +5,7 @@ from ui.editors.base_editor import BaseEditor
 
 from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QPushButton, QSlider, QLabel, QFileDialog,
+    QMessageBox, QApplication,
 )
 from PyQt6.QtCore import Qt, QUrl, QTimer
 from PyQt6.QtMultimedia import (
@@ -44,6 +45,18 @@ class AudioEditor(BaseEditor):
         self._load_btn = QPushButton("📂 Загрузить")
         self._load_btn.clicked.connect(self._load_file)
         btn_row.addWidget(self._load_btn)
+
+        self._plugin_btns: list[QPushButton] = []
+        try:
+            from plugins.plugin_manager import get_editor_actions
+            for action in get_editor_actions("audio"):
+                btn = QPushButton(action["label"])
+                btn.setEnabled(False)
+                btn.clicked.connect(lambda checked, h=action["handler"]: h(self))
+                btn_row.addWidget(btn)
+                self._plugin_btns.append(btn)
+        except Exception:
+            pass
 
         self._status_label = QLabel("")
         btn_row.addWidget(self._status_label)
@@ -114,6 +127,7 @@ class AudioEditor(BaseEditor):
             with open(path, "rb") as f:
                 self._audio_data = bytearray(f.read())
             self._play_btn.setEnabled(True)
+            self._set_plugin_btns_enabled(True)
             self._status_label.setText(f"Записано {len(self._audio_data)} байт")
         else:
             self._status_label.setText("Запись не удалась")
@@ -190,6 +204,7 @@ class AudioEditor(BaseEditor):
             with open(path, "rb") as f:
                 self._audio_data = bytearray(f.read())
             self._play_btn.setEnabled(True)
+            self._set_plugin_btns_enabled(True)
             self._status_label.setText(f"Загружено {len(self._audio_data)} байт")
 
     def get_content(self) -> bytes:
@@ -199,17 +214,24 @@ class AudioEditor(BaseEditor):
         self._audio_data = bytearray(data)
         if data:
             self._play_btn.setEnabled(True)
+            self._set_plugin_btns_enabled(True)
             self._status_label.setText(f"Аудио {len(data)} байт")
         else:
             self._play_btn.setEnabled(False)
+            self._set_plugin_btns_enabled(False)
 
     def clear(self):
         self._audio_data = bytearray()
         self._player.stop()
         self._player.setSource(QUrl())
         self._play_btn.setEnabled(False)
+        self._set_plugin_btns_enabled(False)
         self._play_btn.setText("▶ Воспроизвести")
         self._slider.setValue(0)
         self._time_label.setText("00:00 / 00:00")
         self._status_label.setText("")
         self._update_timer.stop()
+
+    def _set_plugin_btns_enabled(self, enabled: bool):
+        for btn in self._plugin_btns:
+            btn.setEnabled(enabled)

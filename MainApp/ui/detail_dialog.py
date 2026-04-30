@@ -159,6 +159,8 @@ class DetailDialog(QDialog):
 
         editor_cls = _EDITOR_MAP.get(self._note.type, TextEditor)
         self._editor = editor_cls()
+        if self._note.id:
+            self._editor.set_note_id(self._note.id)
         self._editor_container.addWidget(self._editor, stretch=1)
 
         if self._note.is_encrypted and self._note.content:

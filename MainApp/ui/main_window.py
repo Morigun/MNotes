@@ -46,6 +46,7 @@ class MainWindow(QMainWindow):
         self._setup_menu_bar()
         self._init_theme_state()
         self._setup_actions()
+        self._load_plugins()
         self._apply_titlebar()
         self._load_notes()
 
@@ -558,6 +559,9 @@ class MainWindow(QMainWindow):
         trash_action.triggered.connect(self._show_trash)
 
         view_menu = menu_bar.addMenu("Вид")
+        settings_action = view_menu.addAction("Настройки...")
+        settings_action.triggered.connect(self._show_settings)
+        view_menu.addSeparator()
         calendar_action = view_menu.addAction("Календарь...")
         calendar_action.triggered.connect(self._show_calendar)
         refresh_action = view_menu.addAction("Обновить")
@@ -575,6 +579,15 @@ class MainWindow(QMainWindow):
         help_menu = menu_bar.addMenu("Помощь")
         about_action = help_menu.addAction("О программе")
         about_action.triggered.connect(self._show_about)
+
+    def _load_plugins(self):
+        from plugins.plugin_manager import load_all_plugins
+        load_all_plugins()
+
+    def _show_settings(self):
+        from ui.settings_dialog import SettingsDialog
+        dialog = SettingsDialog(parent=self)
+        self._exec_dialog(dialog)
 
     def _init_theme_state(self):
         from main import current_theme
