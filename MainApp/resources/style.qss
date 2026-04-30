@@ -311,3 +311,39 @@ QScrollArea {
 #gridContainer {
     background-color: #1e1e2e;
 }
+
+#notesTable {
+    background-color: #1e1e2e;
+    border: none;
+    gridline-color: #313244;
+    color: #cdd6f4;
+    selection-background-color: #313244;
+    selection-color: #cdd6f4;
+}
+
+#notesTable::item {
+    padding: 4px 8px;
+    border-bottom: 1px solid #313244;
+}
+
+#notesTable::item:hover {
+    background-color: #313244;
+}
+
+#viewToggleBtn {
+    background-color: transparent;
+    border: 1px solid #45475a;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #cdd6f4;
+}
+
+#viewToggleBtn:hover {
+    border-color: #89b4fa;
+}
+
+#viewToggleBtn:checked {
+    background-color: #89b4fa;
+    color: #1e1e2e;
+    border-color: #89b4fa;
+}

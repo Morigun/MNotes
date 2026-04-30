@@ -10,3 +10,4 @@ dist/
 *.spec
 vosk/
 plugins/speech2text/recasepunc/checkpoint
+.kilo/

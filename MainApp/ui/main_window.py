@@ -6,13 +6,14 @@ from ui.detail_dialog import DetailDialog
 from ui.sidebar import Sidebar
 from ui.search_bar import SearchBar
 from ui.notes_grid import FlowLayout
+from ui.notes_table import NotesTable
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QScrollArea,
     QToolBar, QStatusBar, QPushButton, QMenu, QLabel, QInputDialog, QMessageBox,
     QApplication, QFileDialog, QFrame,
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QSettings
 from PyQt6.QtGui import QAction, QKeySequence, QIcon, QCloseEvent
 
 
@@ -41,6 +42,8 @@ class MainWindow(QMainWindow):
         self._current_filter: dict = {}
         self._current_parent: int = 0
         self._nav_stack: list[int] = []
+        self._settings = QSettings("MNotes", "MNotes")
+        self._view_mode: str = self._settings.value("view_mode", "grid", type=str)
 
         self._setup_ui()
         self._setup_menu_bar()
@@ -98,7 +101,14 @@ class MainWindow(QMainWindow):
         self._search_bar.search_changed.connect(self._on_search)
         toolbar.addWidget(self._search_bar)
 
-        trash_btn = QPushButton("🗑 Корзина")
+        self._view_toggle_btn = QPushButton("\u0422\u0430\u0431\u043b\u0438\u0446\u0430")
+        self._view_toggle_btn.setObjectName("viewToggleBtn")
+        self._view_toggle_btn.setCheckable(True)
+        self._view_toggle_btn.setToolTip("\u041f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u0432\u0438\u0434")
+        self._view_toggle_btn.clicked.connect(self._toggle_view_mode)
+        toolbar.addWidget(self._view_toggle_btn)
+
+        trash_btn = QPushButton("\U0001f5d1 \u041a\u043e\u0440\u0437\u0438\u043d\u0430")
         trash_btn.clicked.connect(self._show_trash)
         toolbar.addWidget(trash_btn)
 
@@ -137,7 +147,29 @@ class MainWindow(QMainWindow):
         self._grid_container.setObjectName("gridContainer")
         self._flow_layout = FlowLayout(self._grid_container, margin=12, hspacing=12, vspacing=12)
         scroll.setWidget(self._grid_container)
-        right_layout.addWidget(scroll)
+        self._grid_scroll = scroll
+
+        self._notes_table = NotesTable()
+        self._notes_table.note_double_clicked.connect(self._open_note)
+        self._notes_table.note_clicked.connect(self._on_card_clicked)
+        self._notes_table.context_menu_requested.connect(self._on_card_context_menu)
+        self._notes_table.remove_from_folder.connect(self._remove_from_folder)
+        self._notes_table.rename_folder.connect(self._rename_folder)
+        self._notes_table.delete_folder.connect(self._delete_folder)
+
+        table_scroll = QScrollArea()
+        table_scroll.setWidgetResizable(True)
+        table_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        table_scroll.viewport().setAutoFillBackground(False)
+        table_scroll.setObjectName("notesGrid")
+        table_scroll.setWidget(self._notes_table)
+        self._table_scroll = table_scroll
+
+        right_layout.addWidget(self._grid_scroll)
+        right_layout.addWidget(self._table_scroll)
+
+        self._view_toggle_btn.setChecked(self._view_mode == "table")
+        self._apply_view_mode()
 
         main_layout.addWidget(right, stretch=1)
 
@@ -151,6 +183,7 @@ class MainWindow(QMainWindow):
             card.deleteLater()
         self._cards.clear()
         self._selected_ids.clear()
+        self._notes_table.clear_notes()
 
     def _on_card_clicked(self, note_id: int, ctrl: bool):
         if ctrl:
@@ -166,14 +199,22 @@ class MainWindow(QMainWindow):
     def _update_card_selections(self):
         for card in self._cards:
             card.set_selected(card.note_id in self._selected_ids)
+        if self._view_mode == "table":
+            self._notes_table.clear_selection()
+            for nid in self._selected_ids:
+                self._notes_table.set_selected(nid, True)
 
     def _clear_selection(self):
         self._selected_ids.clear()
         self._update_card_selections()
 
     def _select_all(self):
-        self._selected_ids = {c.note_id for c in self._cards}
-        self._update_card_selections()
+        if self._view_mode == "table":
+            self._selected_ids = set(self._notes_table.note_ids)
+            self._notes_table.select_all()
+        else:
+            self._selected_ids = {c.note_id for c in self._cards}
+            self._update_card_selections()
 
     def _card_by_id(self, note_id: int) -> NoteCard | None:
         return next((c for c in self._cards if c.note_id == note_id), None)
@@ -186,11 +227,17 @@ class MainWindow(QMainWindow):
         filters["parent_id"] = self._current_parent
         notes = self._repo.get_notes(**filters)
 
+        categories = {c.id: c.name for c in self._repo.get_all_categories()}
+        in_folder = self._current_parent != 0
+
         for note in notes:
             preview = self._make_preview(note)
             child_count = 0
             if note.type == "folder":
                 child_count = self._repo.get_folder_child_count(note.id)
+            category_name = categories.get(note.category_id, "") if note.category_id else ""
+            tags_str = ", ".join(t.name for t in note.tags)
+
             card = NoteCard(
                 note_id=note.id,
                 title=note.title,
@@ -200,7 +247,7 @@ class MainWindow(QMainWindow):
                 is_encrypted=bool(note.is_encrypted),
                 updated_at=note.updated_at,
                 child_count=child_count,
-                in_folder=self._current_parent != 0,
+                in_folder=in_folder,
             )
             card.double_clicked.connect(self._open_note)
             card.clicked.connect(self._on_card_clicked)
@@ -210,7 +257,36 @@ class MainWindow(QMainWindow):
             card.delete_folder.connect(self._delete_folder)
             self._cards.append(card)
             self._flow_layout.addWidget(card)
+
+            self._notes_table.add_note(
+                note_id=note.id,
+                title=note.title,
+                note_type=note.type,
+                preview=preview,
+                is_pinned=bool(note.is_pinned),
+                is_encrypted=bool(note.is_encrypted),
+                updated_at=note.updated_at,
+                child_count=child_count,
+                category_name=category_name,
+                tags=tags_str,
+                in_folder=in_folder,
+            )
         self._update_status()
+
+    def _toggle_view_mode(self, checked: bool):
+        self._view_mode = "table" if checked else "grid"
+        self._settings.setValue("view_mode", self._view_mode)
+        if hasattr(self, '_table_view_action'):
+            self._table_view_action.setChecked(checked)
+        self._apply_view_mode()
+
+    def _apply_view_mode(self):
+        is_table = self._view_mode == "table"
+        self._grid_scroll.setVisible(not is_table)
+        self._table_scroll.setVisible(is_table)
+        self._view_toggle_btn.setChecked(is_table)
+        btn_text = "\u041a\u0430\u0440\u0442\u043e\u0447\u043a\u0438" if is_table else "\u0422\u0430\u0431\u043b\u0438\u0446\u0430"
+        self._view_toggle_btn.setText(btn_text)
 
     def _update_breadcrumb(self):
         if self._current_parent == 0:
@@ -265,43 +341,62 @@ class MainWindow(QMainWindow):
 
         menu = QMenu(self)
         ids = list(self._selected_ids)
-        folders_in_sel = sum(
-            1 for c in self._cards if c.note_id in self._selected_ids and c.note_type == "folder"
-        )
-        in_folder_in_sel = sum(
-            1 for c in self._cards if c.note_id in self._selected_ids and c._in_folder
-        )
+
+        if self._view_mode == "table":
+            folders_in_sel = sum(
+                1 for nid in self._selected_ids
+                if self._notes_table.get_note_type(nid) == "folder"
+            )
+            in_folder_in_sel = sum(
+                1 for nid in self._selected_ids
+                if self._notes_table.get_in_folder(nid)
+            )
+        else:
+            folders_in_sel = sum(
+                1 for c in self._cards if c.note_id in self._selected_ids and c.note_type == "folder"
+            )
+            in_folder_in_sel = sum(
+                1 for c in self._cards if c.note_id in self._selected_ids and c._in_folder
+            )
 
         if len(ids) == 1:
-            menu.addAction("Открыть", lambda: self._open_selected())
+            menu.addAction("\u041e\u0442\u043a\u0440\u044b\u0442\u044c", lambda: self._open_selected())
         else:
-            menu.addAction(f"Открыть все ({len(ids)})", lambda: self._open_selected())
+            menu.addAction(f"\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0432\u0441\u0435 ({len(ids)})", lambda: self._open_selected())
 
         if len(ids) == 1 and folders_in_sel == 1:
-            menu.addAction("Переименовать", lambda: self._rename_folder(ids[0]))
+            menu.addAction("\u041f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u0442\u044c", lambda: self._rename_folder(ids[0]))
 
         menu.addAction(
-            "Закрепить / Открепить" if len(ids) == 1 else f"Закрепить / Открепить ({len(ids)})",
+            "\u0417\u0430\u043a\u0440\u0435\u043f\u0438\u0442\u044c / \u041e\u0442\u043a\u0440\u0435\u043f\u0438\u0442\u044c" if len(ids) == 1 else f"\u0417\u0430\u043a\u0440\u0435\u043f\u0438\u0442\u044c / \u041e\u0442\u043a\u0440\u0435\u043f\u0438\u0442\u044c ({len(ids)})",
             self._toggle_pin_selected,
         )
 
-        del_label = "В корзину" if len(ids) == 1 else f"В корзину ({len(ids)})"
+        del_label = "\u0412 \u043a\u043e\u0440\u0437\u0438\u043d\u0443" if len(ids) == 1 else f"\u0412 \u043a\u043e\u0440\u0437\u0438\u043d\u0443 ({len(ids)})"
         menu.addAction(del_label, lambda: self._delete_items(ids))
 
         if in_folder_in_sel > 0:
             menu.addSeparator()
             if in_folder_in_sel == 1:
-                nid = next(c.note_id for c in self._cards if c.note_id in self._selected_ids and c._in_folder)
-                menu.addAction("Убрать из папки", lambda: self._remove_from_folder(nid))
+                if self._view_mode == "table":
+                    nid = next(nid for nid in self._selected_ids if self._notes_table.get_in_folder(nid))
+                else:
+                    nid = next(c.note_id for c in self._cards if c.note_id in self._selected_ids and c._in_folder)
+                menu.addAction("\u0423\u0431\u0440\u0430\u0442\u044c \u0438\u0437 \u043f\u0430\u043f\u043a\u0438", lambda: self._remove_from_folder(nid))
             else:
-                menu.addAction(f"Убрать из папки ({in_folder_in_sel})", lambda: self._remove_selected_from_folder())
+                menu.addAction(f"\u0423\u0431\u0440\u0430\u0442\u044c \u0438\u0437 \u043f\u0430\u043f\u043a\u0438 ({in_folder_in_sel})", lambda: self._remove_selected_from_folder())
 
         menu.exec(pos)
 
     def _remove_selected_from_folder(self):
-        for card in self._cards:
-            if card.note_id in self._selected_ids and card._in_folder:
-                self._repo.remove_note_from_folder(card.note_id)
+        if self._view_mode == "table":
+            for nid in self._selected_ids:
+                if self._notes_table.get_in_folder(nid):
+                    self._repo.remove_note_from_folder(nid)
+        else:
+            for card in self._cards:
+                if card.note_id in self._selected_ids and card._in_folder:
+                    self._repo.remove_note_from_folder(card.note_id)
         self._load_notes()
 
     def _delete_folder(self, folder_id: int):
@@ -558,8 +653,13 @@ class MainWindow(QMainWindow):
         trash_action = notes_menu.addAction("Корзина...")
         trash_action.triggered.connect(self._show_trash)
 
-        view_menu = menu_bar.addMenu("Вид")
-        settings_action = view_menu.addAction("Настройки...")
+        view_menu = menu_bar.addMenu("\u0412\u0438\u0434")
+        self._table_view_action = view_menu.addAction("\u0422\u0430\u0431\u043b\u0438\u0447\u043d\u044b\u0439 \u0432\u0438\u0434")
+        self._table_view_action.setCheckable(True)
+        self._table_view_action.setChecked(self._view_mode == "table")
+        self._table_view_action.triggered.connect(self._toggle_view_mode)
+        view_menu.addSeparator()
+        settings_action = view_menu.addAction("\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438...")
         settings_action.triggered.connect(self._show_settings)
         view_menu.addSeparator()
         calendar_action = view_menu.addAction("Календарь...")

@@ -11,7 +11,7 @@ from database.repository import Repository
 from services.reminder_service import ReminderService
 from ui.main_window import MainWindow
 
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 APP_DIR = Path(__file__).parent
 
 MUTEX_NAME = "MNotes_SingleInstance_Mutex"
