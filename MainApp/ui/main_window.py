@@ -782,6 +782,7 @@ class MainWindow(QMainWindow):
             "<p>Поддерживаемые типы: текст, Markdown, форматирование, "
             "списки, таблицы, аудио, изображения, папки.</p>"
             "<p>Шифрование: AES-256-GCM</p>"
+            "<p style='color:gray;font-size:small;'>Сделано с помощью GLM-5.1 (Z.AI)</p>"
         )
 
     def _show_import(self):
