@@ -2,7 +2,16 @@
 
 ## Обзор
 
-MNotes — десктопное приложение для управления заметками, написанное на Python с использованием фреймворка PyQt6. Поддерживает 8 типов заметок, шифрование AES-256-GCM, напоминания, папки с drag-and-drop навигацией, корзину с восстановлением, экспорт/импорт, тёмную и светлую темы, системный трей, систему плагинов.
+MNotes — десктопное приложение для управления заметками, написанное на Python с использованием фреймворка PyQt6. Поддерживает 8 типов заметок, шифрование AES-256-GCM, напоминания, папки с drag-and-drop навигацией, корзину с восстановлением, экспорт/импорт, тёмную и светлую темы, системный трей, систему плагинов, singleton-режим (один экземпляр).
+
+## Версионирование
+
+Версия приложения задаётся константой `APP_VERSION` в `MainApp/main.py`. Текущая версия: **1.0.0**.
+
+Используется в:
+- `QApplication.setApplicationVersion()` — доступна через `QApplication.applicationVersion()`
+- Tooltip иконки в трее: `"MNotes v1.0.0"`
+- Диалог «О программе»: `"MNotes v1.0.0"`
 
 ## Технологический стек
 
@@ -24,6 +33,8 @@ MNotes/
 ├── .gitignore
 ├── README.md
 ├── ARCHITECTURE.md
+├── run.bat                         # Запуск приложения (обёртка → MainApp/run.bat)
+├── build.bat                       # Сборка EXE (обёртка → MainApp/build.bat)
 ├── MainApp/                          # Основное приложение
 │   ├── main.py                       # Точка входа, темы, заголовки окон
 │   ├── requirements.txt              # Зависимости приложения
@@ -374,6 +385,33 @@ categories          tags                notes
 - Контент шифруется AES-256-GCM
 - Ключ шифрования выводится из пароля через PBKDF2 (200000 итераций, SHA-256, 32 байта)
 - Случайные salt (16 байт) и nonce (12 байт) для каждой шифровки
+
+## Singleton (один экземпляр приложения)
+
+Приложение работает в режиме одного экземпляра. Повторный запуск не создаёт новое окно, а раскрывает уже запущенное.
+
+### Механизм
+
+1. **Named Mutex** (`"MNotes_SingleInstance_Mutex"`) — проверяется **до** создания `QApplication`:
+   - `CreateMutexW` — если мьютекс уже существует (`GetLastError() == 183` / `ERROR_ALREADY_EXISTS`), значит первый экземпляр запущен
+2. **Named Event** (`"MNotes_Activate_Event"`) — межпроцессное взаимодействие:
+   - Первый экземпляр создаёт event через `CreateEventW` и опрашивает его через `QTimer` каждые 200 мс (`WaitForSingleObject` с timeout=0)
+   - Второй экземпляр открывает event через `OpenEventW` и сигнализирует через `SetEvent()`, затем завершается
+   - Первый экземпляр ловит сигнал и вызывает `window._restore()` — `showNormal()` + `activateWindow()` + `raise_()`
+3. Преимущество перед `ShowWindow` из чужого процесса: окно восстанавливается через собственный Qt event loop, что гарантирует корректную перерисовку
+
+### Код (`main.py`)
+
+```
+main():
+  ├── CreateMutexW("MNotes_SingleInstance_Mutex")
+  ├── if already_running:
+  │     OpenEventW("MNotes_Activate_Event") → SetEvent → exit
+  ├── QApplication(...)
+  ├── CreateEventW("MNotes_Activate_Event")
+  ├── QTimer(200ms) → WaitForSingleObject → window._restore()
+  └── ...
+```
 
 ## Системный трей
 

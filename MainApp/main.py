@@ -4,14 +4,18 @@ from pathlib import Path
 
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
 from PyQt6.QtGui import QFont, QAction, QIcon
-from PyQt6.QtCore import Qt, QSettings
+from PyQt6.QtCore import Qt, QSettings, QTimer
 
 from database.db_manager import DatabaseManager
 from database.repository import Repository
 from services.reminder_service import ReminderService
 from ui.main_window import MainWindow
 
+APP_VERSION = "1.0.0"
 APP_DIR = Path(__file__).parent
+
+MUTEX_NAME = "MNotes_SingleInstance_Mutex"
+ACTIVATE_EVENT_NAME = "MNotes_Activate_Event"
 
 THEMES = {
     "dark": APP_DIR / "resources" / "style.qss",
@@ -49,6 +53,18 @@ def apply_titlebar_theme(widget, dark: bool) -> None:
 
 
 def main():
+    kernel32 = ctypes.windll.kernel32
+
+    mutex = kernel32.CreateMutexW(None, False, MUTEX_NAME)
+    already_running = kernel32.GetLastError() == 183
+
+    if already_running:
+        event = kernel32.OpenEventW(0x0002, False, ACTIVATE_EVENT_NAME)
+        if event:
+            kernel32.SetEvent(event)
+            kernel32.CloseHandle(event)
+        sys.exit(0)
+
     try:
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("MNotes")
     except Exception:
@@ -56,9 +72,12 @@ def main():
 
     app = QApplication(sys.argv)
     app.setApplicationName("MNotes")
+    app.setApplicationVersion(APP_VERSION)
     app.setStyle("Fusion")
     app.setFont(QFont("Segoe UI", 10))
     app.setQuitOnLastWindowClosed(False)
+
+    activate_event = kernel32.CreateEventW(None, False, False, ACTIVATE_EVENT_NAME)
 
     app_icon = QIcon(str(APP_DIR / "app.ico"))
     app.setWindowIcon(app_icon)
@@ -72,6 +91,14 @@ def main():
 
     window = MainWindow()
     window.setWindowIcon(app_icon)
+
+    def check_activate():
+        if kernel32.WaitForSingleObject(activate_event, 0) == 0:
+            window._restore()
+
+    activate_timer = QTimer()
+    activate_timer.timeout.connect(check_activate)
+    activate_timer.start(200)
 
     icon = app_icon
 
@@ -87,7 +114,7 @@ def main():
     tray = QSystemTrayIcon()
     tray.setIcon(QIcon(icon))
     tray.setContextMenu(tray_menu)
-    tray.setToolTip("MNotes")
+    tray.setToolTip(f"MNotes v{APP_VERSION}")
     tray.activated.connect(lambda reason: window._restore() if reason == QSystemTrayIcon.ActivationReason.DoubleClick else None)
     tray.show()
 

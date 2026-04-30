@@ -674,9 +674,10 @@ class MainWindow(QMainWindow):
         self._sidebar.setVisible(checked)
 
     def _show_about(self):
+        from main import APP_VERSION
         QMessageBox.about(
             self, "О программе",
-            "<h3>MNotes</h3>"
+            f"<h3>MNotes v{APP_VERSION}</h3>"
             "<p>Десктопное приложение для управления заметками.</p>"
             "<p>Поддерживаемые типы: текст, Markdown, форматирование, "
             "списки, таблицы, аудио, изображения, папки.</p>"
