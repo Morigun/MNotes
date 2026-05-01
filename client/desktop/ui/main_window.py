@@ -50,6 +50,7 @@ class MainWindow(QMainWindow):
         self._init_theme_state()
         self._setup_actions()
         self._load_plugins()
+        self._add_plugin_toolbar_actions()
         self._apply_titlebar()
         self._load_notes()
 
@@ -683,6 +684,16 @@ class MainWindow(QMainWindow):
     def _load_plugins(self):
         from plugins.plugin_manager import load_all_plugins
         load_all_plugins()
+
+    def _add_plugin_toolbar_actions(self):
+        from plugins.plugin_manager import get_toolbar_actions
+        toolbar = self.findChild(QToolBar, "mainToolbar")
+        if not toolbar:
+            return
+        for action in get_toolbar_actions():
+            btn = QPushButton(action["label"])
+            btn.clicked.connect(action["handler"])
+            toolbar.addWidget(btn)
 
     def _show_settings(self):
         from ui.settings_dialog import SettingsDialog

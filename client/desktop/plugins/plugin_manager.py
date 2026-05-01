@@ -6,12 +6,19 @@ from typing import Optional
 
 _plugins: dict[str, object] = {}
 _editor_actions: dict[str, list] = {}
+_toolbar_actions: list[dict] = []
 
 
 def _get_plugins_dirs() -> list[Path]:
+    dirs = []
+    base = Path(__file__).resolve().parent
+    dirs.append(base)
+    root_plugins = base.parent.parent.parent / "plugins"
+    if root_plugins.is_dir():
+        dirs.append(root_plugins)
     if getattr(sys, 'frozen', False):
-        return [Path(sys.executable).parent / "plugins"]
-    return [Path(__file__).resolve().parent]
+        dirs.insert(0, Path(sys.executable).parent / "plugins")
+    return dirs
 
 
 _plugins_dirs: list[Path] = _get_plugins_dirs()
@@ -81,6 +88,14 @@ def register_editor_action(editor_type: str, label: str, handler):
         "label": label,
         "handler": handler,
     })
+
+
+def register_toolbar_action(label: str, handler):
+    _toolbar_actions.append({"label": label, "handler": handler})
+
+
+def get_toolbar_actions() -> list[dict]:
+    return list(_toolbar_actions)
 
 
 def get_editor_actions(editor_type: str) -> list[dict]:

@@ -97,7 +97,48 @@ class DatabaseManager:
             self._connection.execute(
                 "ALTER TABLE notes ADD COLUMN deleted_parent_name TEXT"
             )
-            self._connection.commit()
+        if "sync_uuid" not in cols:
+            self._connection.execute(
+                "ALTER TABLE notes ADD COLUMN sync_uuid CHAR(36)"
+            )
+            self._connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_notes_sync_uuid ON notes(sync_uuid)"
+            )
+
+        cat_cols = [r[1] for r in self._connection.execute("PRAGMA table_info(categories)").fetchall()]
+        if "sync_uuid" not in cat_cols:
+            self._connection.execute(
+                "ALTER TABLE categories ADD COLUMN sync_uuid CHAR(36)"
+            )
+            self._connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_categories_sync_uuid ON categories(sync_uuid)"
+            )
+
+        tag_cols = [r[1] for r in self._connection.execute("PRAGMA table_info(tags)").fetchall()]
+        if "sync_uuid" not in tag_cols:
+            self._connection.execute(
+                "ALTER TABLE tags ADD COLUMN sync_uuid CHAR(36)"
+            )
+            self._connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_tags_sync_uuid ON tags(sync_uuid)"
+            )
+        if "updated_at" not in tag_cols:
+            self._connection.execute(
+                "ALTER TABLE tags ADD COLUMN updated_at TEXT"
+            )
+            self._connection.execute(
+                "UPDATE tags SET updated_at = datetime('now') WHERE updated_at IS NULL"
+            )
+
+        if "updated_at" not in cat_cols:
+            self._connection.execute(
+                "ALTER TABLE categories ADD COLUMN updated_at TEXT"
+            )
+            self._connection.execute(
+                "UPDATE categories SET updated_at = datetime('now') WHERE updated_at IS NULL"
+            )
+
+        self._connection.commit()
 
     def init_db(self):
         _ = self.connection

@@ -47,12 +47,12 @@ run.bat
 build.bat
 ```
 
-Готовый файл: `MainApp/dist/MNotes.exe`
+Готовый файл: `client/desktop/dist/MNotes.exe`
 
 ### Ручная установка
 
 ```bash
-cd MainApp
+cd client/desktop
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
@@ -62,14 +62,14 @@ python main.py
 ### Установка плагина speech2text
 
 ```bash
-cd Plugins/speech2text
+cd plugins/speech2text
 pip install -r requirements.txt
 ```
 
 Для сборки плагина как дистрибутива:
 
 ```batch
-cd Plugins/speech2text
+cd plugins/speech2text
 build.bat
 ```
 
@@ -79,7 +79,7 @@ build.bat
 
 1. Перейдите на страницу [alphacephei.com/vosk/models](https://alphacephei.com/vosk/models)
 2. Скачайте архив с нужной моделью (например, `vosk-model-small-ru-0.22` ~50 МБ или `vosk-model-ru-0.42` ~1.6 ГБ для лучшего качества)
-3. Распакуйте архив в папку `vosk/` рядом с приложением (при запуске из исходников — `MNotes/vosk/`, при EXE — рядом с `MNotes.exe`)
+ 3. Распакуйте архив в папку `vosk/` рядом с приложением (при запуске из исходников — `client/desktop/vosk/`, при EXE — рядом с `MNotes.exe`)
 4. В настройках приложения (раздел «Распознавание речи») укажите папку с моделями и выберите нужную модель из списка
 
 Плагин автоматически находит все модели в указанной папке (каждая модель — подпапка с каталогом `am/`). Выбранная модель используется для транскрибации аудиозаметок через кнопку «В текст» в аудиоредакторе.
@@ -120,21 +120,31 @@ build.bat
 MNotes/
 ├── run.bat                     # Запуск приложения (обёртка)
 ├── build.bat                   # Сборка EXE (обёртка)
-├── MainApp/                     # Основное приложение
-│   ├── main.py                  # Точка входа, темы, singleton, заголовки окон
-│   ├── database/                # SQLite: модели, репозиторий, миграции
-│   ├── plugins/                 # Система плагинов (базовый класс, менеджер)
-│   ├── services/                # Шифрование, экспорт, напоминания
-│   ├── ui/                      # Окна, диалоги, редакторы
-│   │   └── editors/             # 8 редакторов по типам заметок
-│   └── resources/               # Темы (QSS): тёмная и светлая
-└── Plugins/                     # Плагины (каждый в своей папке)
-    └── speech2text/             # Распознавание речи (Vosk)
-        ├── plugin.json          # Манифест плагина
-        ├── stt_service.py       # Сервис транскрибации
-        ├── vosk_shim.py         # FFI-обёртка libvosk.dll
-        ├── settings.py          # Настройки модели (QSettings)
-        └── build.py             # Сборка дистрибутива плагина
+├── client/                     # Клиентская часть
+│   └── desktop/                # Десктопное приложение
+│       ├── main.py             # Точка входа, темы, singleton, заголовки окон
+│       ├── database/           # SQLite: модели, репозиторий, миграции
+│       ├── plugins/            # Система плагинов (базовый класс, менеджер)
+│       ├── services/           # Шифрование, экспорт, напоминания
+│       ├── ui/                 # Окна, диалоги, редакторы
+│       │   └── editors/        # 8 редакторов по типам заметок
+│       └── resources/          # Темы (QSS): тёмная и светлая
+├── server/                     # Серверная часть (PHP)
+│   ├── index.php               # Точка входа API
+│   ├── auth.php                # Авторизация
+│   ├── sync.php                # Синхронизация данных
+│   ├── config.php              # Конфигурация БД
+│   ├── schema.sql              # Схема БД сервера
+│   └── setup_db.php            # Создание таблиц
+├── plugins/                    # Плагины (каждый в своей папке)
+│   ├── cloud_sync/             # Облачная синхронизация
+│   └── speech2text/            # Распознавание речи (Vosk)
+│       ├── plugin.json         # Манифест плагина
+│       ├── stt_service.py      # Сервис транскрибации
+│       ├── vosk_shim.py        # FFI-обёртка libvosk.dll
+│       ├── settings.py         # Настройки модели (QSettings)
+│       └── build.py            # Сборка дистрибутива плагина
+└── installer.wxs               # WiX v4 инсталлятор (MSI)
 ```
 
 Подробная архитектура описана в [ARCHITECTURE.md](ARCHITECTURE.md).
@@ -145,7 +155,7 @@ MNotes/
 
 ### Как создать плагин
 
-1. Создайте папку в `Plugins/` с файлом `plugin.json`:
+1. Создайте папку в `plugins/` с файлом `plugin.json`:
 
 ```json
 {

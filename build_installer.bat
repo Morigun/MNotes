@@ -9,7 +9,7 @@ echo.
 taskkill /IM MNotes.exe /F >nul 2>&1
 
 echo [1/3] Building MNotes.exe ...
-cd /d "%~dp0MainApp"
+cd /d "%~dp0client\desktop"
 
 if not exist ".venv\Scripts\activate.bat" (
     echo Creating venv...
@@ -73,7 +73,7 @@ if errorlevel 1 (
 )
 
 echo Running: wix build installer.wxs -ext WixToolset.UI.wixext
-wix build "%~dp0installer.wxs" -ext WixToolset.UI.wixext -o "%~dp0installer_output\MNotes_1.1.0.msi"
+wix build "%~dp0installer.wxs" -ext WixToolset.UI.wixext -o "%~dp0installer_output\MNotes_1.1.1.msi"
 
 if errorlevel 1 (
     echo MSI build failed
@@ -83,6 +83,6 @@ if errorlevel 1 (
 
 echo.
 echo ========================================
-echo   Done: installer_output\MNotes_1.1.0.msi
+echo   Done: installer_output\MNotes_1.1.1.msi
 echo ========================================
 pause

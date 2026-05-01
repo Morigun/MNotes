@@ -4,7 +4,7 @@
   <Package
     Name="MNotes"
     Manufacturer="MNotes"
-    Version="1.1.0"
+    Version="1.1.1"
     UpgradeCode="8f6c2d1a-4e7b-4a3f-9d2c-5b8e1f6a3c7d"
     Scope="perMachine"
     Compressed="yes">
@@ -16,7 +16,7 @@
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
     <WixVariable Id="WixUILicenseRtf" Value="LICENSE.rtf" />
 
-    <Icon Id="AppIcon" SourceFile="MainApp\app.ico" />
+    <Icon Id="AppIcon" SourceFile="client\desktop\app.ico" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon" />
 
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/user/MNotes" />
@@ -31,7 +31,7 @@
 
     <ComponentGroup Id="AppComponents" Directory="INSTALLFOLDER">
       <Component Id="MainExe">
-        <File Id="MNotesExe" Source="MainApp\dist\MNotes.exe" KeyPath="yes">
+        <File Id="MNotesExe" Source="client\desktop\dist\MNotes.exe" KeyPath="yes">
           <Shortcut
             Id="StartMenuShortcut"
             Directory="ProgramMenuFolder"
@@ -49,7 +49,7 @@
         </File>
       </Component>
       <Component Id="AppIconFile">
-        <File Id="IconFile" Source="MainApp\app.ico" />
+        <File Id="IconFile" Source="client\desktop\app.ico" />
       </Component>
     </ComponentGroup>
 
