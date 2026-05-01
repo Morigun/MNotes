@@ -1,0 +1,6 @@
+{
+    "name": "cloud_sync",
+    "version": "1.0.0",
+    "description": "Синхронизация с удалённой БД через PHP сервер",
+    "requires": ["requests"]
+}
